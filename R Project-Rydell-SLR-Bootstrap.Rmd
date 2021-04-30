@@ -1,0 +1,214 @@
+---
+title: 'R project: SLR and Bootstrap'
+author: "Rydell Samuels"
+date: "10/31/20"
+output:
+  pdf_document:
+    toc: yes
+  word_document:
+    toc: yes
+  html_document:
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+r = getOption("repos")
+r["CRAN"] = "http://cran.us.r-project.org"
+options(repos = r)
+install.packages("s20x")
+install.packages("ggplot2")
+library(s20x)
+library(ggplot2)
+library(boot)
+
+```
+
+
+# Our Simple Linear Regression (SLR) and Bootstrap project consists of theories we need to describe and interpret our dataset "mtcars". The packages needed for our data set would be "s20x" and for plots we would need to call our "ggplot2" package.
+
+
+
+
+#SLR (Simple Linear Regression)
+We will give a demo of the `myslr()` function. This function will need to create estimates for the betas in a  slr.
+The function will take an x vector and a y vector.
+
+
+# Hear is our data. We will all apply our function to the mtcars data set and make a linear model. Our data will describe the data mtcars, the nature and type of the variables. We will also plot and interpret our data
+
+# Description of mtcars data
+
+```{r mtcars}
+
+library(s20x)
+data(mtcars)
+head(mtcars)
+library(ggplot2) 
+g = ggplot(mtcars, aes(x = wt, y=mpg, fill = cyl)) + geom_point() + geom_smooth(method="lm", formula=y~x)
+g
+
+names(mtcars) # output of mtcars with name function
+
+summary(mtcars) # output of mtcars with summary function. Viewing important information in our variables such at the Min, Mean and Max.
+
+mtcars # Looking at the whole content of the dataframe
+
+class(mtcars[,1]) 
+class(mtcars[,6]) # Output here shows both of our objects are in a numerica class
+
+mtcars [,c(1,6)] # Here I wwe just want to take a look at two columns which consists of miles per gallon (mgp) & weight (wt).
+
+tab1 = table(mtcars$mpg) # Table with mpg data
+tab2 = table(mtcars$mpg[1:10]) # Table with first 10 mpg
+
+pie(tab1) # Pie chart with no labels
+pie(tab2) # Pie chart with no lables
+
+windows()
+pie(table(mtcars$wt)) #Making a pie chart with default options
+pie(table(mtcars$wt), cex = 0.9) #Making a pie chart with different point size
+
+barplot(tab1, col = c("Red", "Green", "Blue"))
+
+with(mtcars, boxplot(cyl~mpg)) #Making a boxplot with no labels on it
+#1h
+plot(cyl~wt, data = mtcars) #Scatterplot cylinder vs weight
+plot(wt~cyl, data = mtcars) #Scatterplot of weight vs cylinder
+
+```
+
+# Theory used - Simple Liner Regression
+$$y_i = \beta_0 + \beta_i x_i + \epsilon_i$$
+```{r y.lm}
+
+# Application of SLR to the mtcars data set
+# Use R to analysze the data
+
+y.lm=lm(mpg~wt,data=mtcars)
+
+#Interpret the summary output.
+summary(y.lm)
+
+# Checking assumptions and give the point and interval estimates
+ciReg(y.lm) 
+
+normcheck(y.lm, shapiro.wilk = TRUE)
+
+plot(y.lm, which =1)
+
+#What are the point and interval estimates? Intercept 37.2851, wt-5.3445
+#Given full description of validity of our model we can see our residuals from Min to Max are almost a set of 10 in our range
+```
+
+# Now make your function:
+
+```{r}
+# Making my function name model and looking for best model
+model <- lm(mpg ~ wt, data = mtcars)
+
+summary(model)
+
+
+## Simple linear regression with mpg as the dependent variable and transmission type (wt) as the independent variable
+
+model1 <- lm(mpg ~ wt , data = mtcars) 
+
+model2 <- lm(mpg ~ wt + am, data = mtcars) 
+
+model3 <- lm(mpg ~ wt + am + hp , data = mtcars) 
+
+model4 <- lm(mpg ~ wt + am + hp + cyl, data = mtcars) 
+
+model5 <- lm(mpg ~ wt + am + hp + cyl + disp, data = mtcars) 
+
+model6 <- lm(mpg ~ ., data = mtcars)
+
+
+### Plots
+plot(mpg ~ wt, data = mtcars, xlab = "Weight", ylab = "MPG",main = "Figure 1. MPG vs Weight")
+
+
+par(mfrow = c(2,2))
+
+plot(model3)
+
+```
+
+
+# myslr
+
+```{r myslr}
+
+# 
+myslr = function(x,y)
+
+{
+  y.lm = lm(mtcars$mpg~mtcars$wt)
+  
+  sum=summary(y.lm)
+  
+  ci=ciReg(y.lm)
+  
+  
+  g=ggplot(mtcars, aes(x = mtcars$wt, y=mtcars$mpg)) +
+  geom_point() + geom_smooth(method="lm",formula = y~x)
+  
+  print(g)
+  return(list(summary=sum, ci=ci))
+}
+  
+
+
+```
+
+# Now invoke your functiion
+
+```{r invokeslr, eval=FALSE}
+obj1 = myslr(x=wt,y=mpg)
+obj1
+
+```
+
+
+
+# Bootstrap function will create estimates from a sample. The parameter estimated will be the population variance $\sigma^2$ of mpg for 4 cylinder cars.
+
+
+
+# Here we will begin to make the function showing x is a sample vector, alpha is the error rate, the '100(1-alpha)%', confidence interval is 'quantile(stat, c(alpha/2,1-alpha/2))
+
+```{r myboot}
+myboot = function(iter=100,x, fun="var", alpha=2, cx=4,...)
+{
+  n = length(x) # sample size
+  
+  y=sample(x, n*iter,replace = TRUE)
+  rs.mat=matrix(y,nr=n,nc=iter,byrow = TRUE)
+  xstat=apply(rs.mat,2,fun) # xstat shows as a vector and will have 100 inter values in it
+  ci=quantile(xstat, c(alpha/2,1-alpha/2)) # Here is our confidence interval
+  # Here we will make a histogram with our object para which contains the parameters for the histogram
+  para=hist(xstat,freq = FALSE, las=1, main=paste("Histogram of Bootstrap Sample statistics","\n","alpha=","iter=",iter,sep = ""),...)
+}
+
+```
+
+
+
+# Invoke your function for the mtcars dataset
+
+Must get x by using `subset()` or something else
+
+```{r, eval=FALSE}
+
+set.seed(40); sam=rnorm(20,mean=20,sd=10)
+
+obj = myboot(100,x=sam, fun="var", alpha=2, xlab="variance", col="Green",cx=4)
+obj
+```
+
+# Make a <5 min recording of both functions running on the data sets with your explanation
+
+You can use quicktime .mov for a mac or use BBFLASH free edition for PC -- make as a small file (keep as .fbr)
+
+[https://www.flashbackrecorder.com/express/download/](https://www.flashbackrecorder.com/express/download/)
